@@ -11,17 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('bookings', function (Blueprint $table) {
+        Schema::create('designers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('designer_id')->constrained()->onDelete('cascade');
-            $table->foreignId('service_id')->constrained()->onDelete('cascade');
-            $table->date('booking_date');
+            $table->string('specialty');
+            $table->text('bio')->nullable();
+            $table->string('photo')->nullable();
+            $table->json('working_days'); // jours de la semaine [0,1,2,3,4,5,6] pour Dim-Lun-Mar-Mer-Jeu-Ven-Sam
             $table->time('start_time');
             $table->time('end_time');
-            $table->decimal('price', 10, 2);
-            $table->enum('status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
-            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
@@ -31,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('bookings');
+        Schema::dropIfExists('designers');
     }
 };

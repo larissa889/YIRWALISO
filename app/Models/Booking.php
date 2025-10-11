@@ -3,163 +3,65 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
-    use SoftDeletes;
-
     protected $fillable = [
-        'booking_number',
         'user_id',
-        'accommodation_id',
-        'activity_id',
-        'check_in_date',
-        'check_out_date',
-        'activity_date',
-        'number_of_guests',
-        'total_amount',
-        'paid_amount',
-        'payment_status',
-        'booking_status',
-        'special_requests',
-        'cancellation_reason',
+        'designer_id',
+        'service_id',
+        'booking_date',
+        'start_time',
+        'end_time',
+        'price',
+        'status',
+        'notes'
     ];
 
     protected $casts = [
-        'check_in_date' => 'date',
-        'check_out_date' => 'date',
-        'activity_date' => 'datetime',
-        'total_amount' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
-        'number_of_guests' => 'integer',
+        'booking_date' => 'date',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+        'price' => 'decimal:2',
     ];
 
-    // Status Constants
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_CONFIRMED = 'confirmed';
-    public const STATUS_CANCELLED = 'cancelled';
-    public const STATUS_COMPLETED = 'completed';
-
-    public const PAYMENT_STATUS_PENDING = 'pending';
-    public const PAYMENT_STATUS_PARTIAL = 'partial';
-    public const PAYMENT_STATUS_PAID = 'paid';
-    public const PAYMENT_STATUS_REFUNDED = 'refunded';
-    public const PAYMENT_STATUS_FAILED = 'failed';
-
-    // Relations
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function accommodation(): BelongsTo
+    public function designer(): BelongsTo
     {
-        return $this->belongsTo(Accommodation::class);
+        return $this->belongsTo(Designer::class);
     }
 
-    public function activity(): BelongsTo
+    public function service(): BelongsTo
     {
-        return $this->belongsTo(Activity::class);
+        return $this->belongsTo(Service::class);
     }
 
-    public function payments(): HasMany
+    public function getFormattedDateAttribute()
     {
-        return $this->hasMany(Payment::class);
+        return $this->booking_date->format('d/m/Y');
     }
 
-    // Scopes
-    public function scopeUpcoming($query)
+    public function getFormattedTimeAttribute()
     {
-        return $query->where('check_in_date', '>=', now())
-            ->orWhere('activity_date', '>=', now())
-            ->where('booking_status', self::STATUS_CONFIRMED);
+        return \Carbon\Carbon::parse($this->start_time)->format('H:i');
     }
 
-    public function scopePending($query)
+    public function getStatusBadgeAttribute()
     {
-        return $query->where('booking_status', self::STATUS_PENDING);
-    }
+        $statuses = [
+            'pending' => 'bg-yellow-100 text-yellow-800',
+            'confirmed' => 'bg-green-100 text-green-800',
+            'completed' => 'bg-blue-100 text-blue-800',
+            'cancelled' => 'bg-red-100 text-red-800',
+        ];
 
-    public function scopeConfirmed($query)
-    {
-        return $query->where('booking_status', self::STATUS_CONFIRMED);
-    }
-
-    public function scopeCancelled($query)
-    {
-        return $query->where('booking_status', self::STATUS_CANCELLED);
-    }
-
-    // Helpers
-    public function calculateTotalNights(): int
-    {
-        if (!$this->check_in_date || !$this->check_out_date) {
-            return 0;
-        }
-        
-        return $this->check_in_date->diffInDays($this->check_out_date);
-    }
-
-    public function calculateTotalAmount(): float
-    {
-        if ($this->accommodation_id) {
-            $nights = $this->calculateTotalNights();
-            return $this->accommodation->price_per_night * $nights;
-        }
-        
-        if ($this->activity_id) {
-            return $this->activity->price_per_person * $this->number_of_guests;
-        }
-        
-        return 0;
-    }
-
-    public function calculateBalance(): float
-    {
-        return $this->total_amount - $this->paid_amount;
-    }
-
-    public function isFullyPaid(): bool
-    {
-        return $this->paid_amount >= $this->total_amount;
-    }
-
-    public function cancel(string $reason = null): void
-    {
-        $this->update([
-            'booking_status' => self::STATUS_CANCELLED,
-            'cancellation_reason' => $reason,
-        ]);
-    }
-
-    public function confirm(): void
-    {
-        $this->update(['booking_status' => self::STATUS_CONFIRMED]);
-    }
-
-    public function addPayment(float $amount, string $method, string $transactionId = null, string $notes = null): Payment
-    {
-        $payment = $this->payments()->create([
-            'amount' => $amount,
-            'payment_method' => $method,
-            'transaction_id' => $transactionId,
-            'notes' => $notes,
-            'status' => 'completed',
-            'payment_date' => now(),
-        ]);
-
-        $this->increment('paid_amount', $amount);
-        
-        // Update payment status if fully paid
-        if ($this->paid_amount >= $this->total_amount) {
-            $this->update(['payment_status' => self::PAYMENT_STATUS_PAID]);
-        } elseif ($this->paid_amount > 0) {
-            $this->update(['payment_status' => self::PAYMENT_STATUS_PARTIAL]);
-        }
-
-        return $payment;
+        return '<span class="px-2 py-1 text-xs font-semibold rounded-full ' .
+               ($statuses[$this->status] ?? 'bg-gray-100 text-gray-800') . '">' .
+               ucfirst($this->status) . '</span>';
     }
 }

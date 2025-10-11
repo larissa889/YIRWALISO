@@ -2,31 +2,23 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
         'phone',
-        'address',
-        'city',
-        'country',
-        'postal_code',
         'avatar',
-        'role_id',
-        'is_active',
-        'last_login_at',
-        'last_login_ip',
+        'role', // 'admin', 'designer', 'client'
     ];
 
     protected $hidden = [
@@ -36,15 +28,11 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'is_active' => 'boolean',
-        'last_login_at' => 'datetime',
     ];
 
-    // Relations
-    public function role()
+    public function designer()
     {
-        return $this->belongsTo(Role::class);
+        return $this->hasOne(Designer::class);
     }
 
     public function bookings()
@@ -52,52 +40,18 @@ class User extends Authenticatable
         return $this->hasMany(Booking::class);
     }
 
-    public function testimonials()
+    public function isAdmin(): bool
     {
-        return $this->hasMany(Testimonial::class);
+        return $this->role === 'admin';
     }
 
-    /**
-     * Get the designer profile associated with the user.
-     */
-    public function designerProfile()
-    {
-        return $this->hasOne(DesignerProfile::class);
-    }
-
-    // Helpers
-    public function hasRole($roleName)
-    {
-        return $this->role && $this->role->name === $roleName;
-    }
-
-    public function isAdmin()
-    {
-        return $this->hasRole('admin');
-    }
-
-    public function isStaff()
-    {
-        return $this->hasRole('staff');
-    }
-
-    public function isClient()
-    {
-        return $this->hasRole('client');
-    }
-
-    /**
-     * Check if the user is a designer.
-     */
     public function isDesigner(): bool
     {
-        return $this->hasRole('designer') || $this->designerProfile()->exists();
+        return $this->role === 'designer';
     }
 
-    public function hasPermission($permissionName)
+    public function isClient(): bool
     {
-        if (!$this->role) return false;
-        
-        return $this->role->permissions()->where('name', $permissionName)->exists();
+        return $this->role === 'client' || $this->role === null;
     }
 }
